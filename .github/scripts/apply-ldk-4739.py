@@ -68,7 +68,7 @@ fn test_duplicate_onchain_forward_claim_with_other_downstream_blocker() {
 		.with_bolt11_features(nodes[1].node.bolt11_invoice_features())
 		.unwrap();
 	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 1_000_000);
-	let route = Route { paths: mpp_paths, route_params: Some(route_params) };
+	let route = Route { paths: mpp_paths, route_params };
 	let onion = RecipientOnionFields::secret_only(mpp_secret, 1_000_000);
 	nodes[0]
 		.node

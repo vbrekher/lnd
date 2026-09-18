@@ -1,0 +1,32 @@
+name: Temporary review fix 11181
+on: [push]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Apply documentation fix
+        shell: bash
+        env:
+          OLD_B64: QnkgZGVmYXVsdCwgTmV1dHJpbm8gZG9lcyBub3QgdmFsaWRhdGUgZXZlcnkgYWR2ZXJ0aXNlZCBjaGFubmVsIGFnYWluc3QgaXRzCmZ1bmRpbmcgdHJhbnNhY3Rpb24uIFRoaXMgbWFrZXMgZ3JhcGggc3luYyBtdWNoIGZhc3RlciBhbmQgcmVkdWNlcyBiYW5kd2lkdGgsCmJ1dCBjaGFubmVscyBsZWFybmVkIHRoaXMgd2F5IG1heSBub3QgaGF2ZSBmdW5kaW5nIG91dHBvaW50cyBvciBjYXBhY2l0aWVzCmF2YWlsYWJsZSBpbiBncmFwaCBSUEMgcmVzcG9uc2VzLiBTZXQgYC0tbmV1dHJpbm8udmFsaWRhdGVjaGFubmVscz10cnVlYCB3aGVuCnlvdXIgYXBwbGljYXRpb24gcmVxdWlyZXMgdGhvc2UgY2hhbm5lbHMgdG8gYmUgdmFsaWRhdGVkIGFnYWluc3QgdGhlIGNoYWluLgpUaGlzIG1ha2VzIGdyYXBoIHN5bmMgc2xvd2VyIGJlY2F1c2UgdGhlIGJsb2NrcyBjb250YWluaW5nIHRoZSBjaGFubmVsIGZ1bmRpbmcKdHJhbnNhY3Rpb25zIG11c3QgYmUgZG93bmxvYWRlZC4K
+          NEW_B64: QnkgZGVmYXVsdCwgTmV1dHJpbm8gZG9lcyBub3QgdmFsaWRhdGUgYW5ub3VuY2VkIGNoYW5uZWxzIGFnYWluc3QgdGhlaXIKZnVuZGluZyB0cmFuc2FjdGlvbnMuIFRoaXMgbWFrZXMgZ3JhcGggc3luYyBtdWNoIGZhc3RlciBhbmQgcmVkdWNlcyBiYW5kd2lkdGgsCmJ1dCBjaGFubmVscyBsZWFybmVkIHRoaXMgd2F5IGhhdmUgbm8gZnVuZGluZyBvdXRwb2ludCBvciBjYXBhY2l0eTogZ3JhcGggUlBDcwpzdWNoIGFzIGBEZXNjcmliZUdyYXBoYCwgYEdldENoYW5JbmZvYCBhbmQgYFN1YnNjcmliZUNoYW5uZWxHcmFwaGAgcmVwb3J0IGEKemVybyBgY2hhbl9wb2ludGAgYW5kIGEgYGNhcGFjaXR5YCBvZiAwIGZvciB0aGVtLiBTdGFydCBgbG5kYCB3aXRoCmAtLW5ldXRyaW5vLnZhbGlkYXRlY2hhbm5lbHNgIChvciBzZXQgYG5ldXRyaW5vLnZhbGlkYXRlY2hhbm5lbHM9dHJ1ZWAgaW4KYGxuZC5jb25mYCkgd2hlbiB5b3VyIGFwcGxpY2F0aW9uIHJlcXVpcmVzIGNoYW5uZWxzIHRvIGJlIHZhbGlkYXRlZCBhZ2FpbnN0CnRoZSBjaGFpbi4gVGhpcyBtYWtlcyBncmFwaCBzeW5jIHNsb3dlciBiZWNhdXNlIHRoZSBibG9ja3MgY29udGFpbmluZyB0aGUKY2hhbm5lbCBmdW5kaW5nIHRyYW5zYWN0aW9ucyBtdXN0IGJlIGRvd25sb2FkZWQuCgpFbmFibGluZyBjaGFubmVsIHZhbGlkYXRpb24gbGF0ZXIgZG9lcyBub3QgcmV0cm9hY3RpdmVseSByZXZhbGlkYXRlIGNoYW5uZWwKYW5ub3VuY2VtZW50cyB0aGF0IGFyZSBhbHJlYWR5IGluIHRoZSBncmFwaCwgYmVjYXVzZSBrbm93biBlZGdlcyBza2lwCmFubm91bmNlbWVudCB2YWxpZGF0aW9uLiBJdCBvbmx5IGFmZmVjdHMgY2hhbm5lbHMgbGVhcm5lZCBhZnRlciB2YWxpZGF0aW9uIGlzCmVuYWJsZWQ7IGV4aXN0aW5nIHplcm8gb3V0cG9pbnRzIGFuZCBjYXBhY2l0aWVzIGNhbiB0aGVyZWZvcmUgcmVtYWluIHVudGlsIHRoZQpncmFwaCBlbnRyeSBpcyByZWxlYXJuZWQuCg==
+        run: |
+          python3 -c "import base64,os,pathlib; p=pathlib.Path('docs/INSTALL.md'); s=p.read_text(); o=base64.b64decode(os.environ['OLD_B64']).decode(); n=base64.b64decode(os.environ['NEW_B64']).decode(); assert s.count(o)==1; p.write_text(s.replace(o,n,1))"
+          git diff --check
+          grep -F -- '--neutrino.validatechannels' docs/INSTALL.md
+          if grep -F -- '--neutrino.validatechannels=true' docs/INSTALL.md; then exit 1; fi
+          python3 -c "from pathlib import Path; bad=[(i,len(l),l) for i,l in enumerate(Path('docs/INSTALL.md').read_text().splitlines(),1) if 428 <= i <= 450 and len(l)>80]; assert not bad,bad"
+      - name: Commit verified source
+        shell: bash
+        run: |
+          git rm .github/workflows/tmp-review-fix-11181.yml
+          git add docs/INSTALL.md
+          git diff --cached --check
+          git config user.name 'Valentin'
+          git config user.email '6142607+vbrekher@users.noreply.github.com'
+          git commit -m 'docs: clarify Neutrino channel validation'
+          git push origin HEAD:review-fix/11181-20260919

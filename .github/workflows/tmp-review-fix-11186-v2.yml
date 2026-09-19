@@ -17,6 +17,7 @@ jobs:
         run: |
           python3 .github/tmp_review_fix_11186.py
           python3 .github/tmp_review_fix_11186_post.py
+          python3 .github/tmp_review_fix_11186_lint.py
           gofmt -w sweep/fee_bumper.go sweep/fee_bumper_missing_inputs_test.go server.go
           git diff --check
       - name: Focused missing-input regression
@@ -35,6 +36,7 @@ jobs:
           git rm --ignore-unmatch \
             .github/tmp_review_fix_11186.py \
             .github/tmp_review_fix_11186_post.py \
+            .github/tmp_review_fix_11186_lint.py \
             .github/workflows/tmp-review-fix-11186.yml \
             .github/workflows/tmp-review-fix-11186-v2.yml
           git add sweep/fee_bumper.go sweep/fee_bumper_missing_inputs_test.go server.go

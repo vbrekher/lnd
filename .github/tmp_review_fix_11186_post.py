@@ -47,7 +47,8 @@ new = """\t\t// A chain lookup can report an output as absent while its
 \t\t\t\t}
 \t\t\t\tif details != nil &&
 \t\t\t\t\tdetails.NumConfirmations == 0 {
-\n\t\t\t\t\tcontinue
+
+\t\t\t\t\tcontinue
 \t\t\t\t}
 \t\t\t}
 \t\t}
@@ -144,3 +145,33 @@ func TestFindMissingInputsConfirmedWalletParent(t *testing.T) {
 assert marker in text, "confirmed parent insertion point"
 text = text.replace(marker, confirmed_test + marker, 1)
 test.write_text(text)
+
+# Keep the final generated source within lnd's custom 80-column and nlreturn
+# rules. These replacements are deliberately narrow so any source drift fails
+# validation instead of silently editing a different location.
+text = fee.read_text()
+old = "\t\t\treturn t.createMissingInputRetryResult(r, ErrInputMissing)\n"
+new = (
+    "\t\t\treturn t.createMissingInputRetryResult(\n"
+    "\t\t\t\tr, ErrInputMissing,\n"
+    "\t\t\t)\n"
+)
+assert text.count(old) == 1, "retry-result line"
+text = text.replace(old, new, 1)
+
+old = (
+    "\t\t\t\tlog.Debugf(\n"
+    "\t\t\t\t\t\"Detected mempool spend of input=%v in tx=%v\",\n"
+    "\t\t\t\t\top, spendingTx.TxHash(),\n"
+    "\t\t\t\t)\n"
+    "\t\t\t\tcontinue\n"
+)
+new = (
+    "\t\t\t\tlog.Debugf(\n"
+    "\t\t\t\t\t\"Detected mempool spend of input=%v \"+\n"
+    "\t\t\t\t\t\t\"in tx=%v\", op, spendingTx.TxHash(),\n"
+    "\t\t\t\t)\n\n"
+    "\t\t\t\tcontinue\n"
+)
+assert text.count(old) == 1, "mempool-spend log block"
+fee.write_text(text.replace(old, new, 1))

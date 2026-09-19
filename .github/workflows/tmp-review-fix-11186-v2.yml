@@ -18,12 +18,22 @@ jobs:
           python3 .github/tmp_review_fix_11186.py
           python3 .github/tmp_review_fix_11186_post.py
           python3 .github/tmp_review_fix_11186_lint.py
-          gofmt -w sweep/fee_bumper.go sweep/fee_bumper_missing_inputs_test.go server.go
+          python3 .github/tmp_review_fix_11186_wiring.py
+          gofmt -w \
+            sweep/fee_bumper.go \
+            sweep/fee_bumper_missing_inputs_test.go \
+            server.go \
+            server_input_lookup_test.go
           git diff --check
       - name: Focused missing-input regression
-        run: go test ./sweep -run 'TestHandleMissingInputs|TestFindMissingInputs' -count=1
+        run: >-
+          go test ./sweep -run
+          'TestHandleMissingInputs|TestFindMissingInputs|TestHandleInitialTxErrorMissingInput|TestHandleReplacementTxErrorMissingInput'
+          -count=1
       - name: Sweep package
         run: go test ./sweep -count=1
+      - name: Production error mapping regression
+        run: go test . -run '^TestClassifyInputUtxoLookup$' -count=1
       - name: Compile root package
         run: go test . -run '^$' -count=1
       - name: Vet changed packages
@@ -37,9 +47,14 @@ jobs:
             .github/tmp_review_fix_11186.py \
             .github/tmp_review_fix_11186_post.py \
             .github/tmp_review_fix_11186_lint.py \
+            .github/tmp_review_fix_11186_wiring.py \
             .github/workflows/tmp-review-fix-11186.yml \
             .github/workflows/tmp-review-fix-11186-v2.yml
-          git add sweep/fee_bumper.go sweep/fee_bumper_missing_inputs_test.go server.go
+          git add \
+            sweep/fee_bumper.go \
+            sweep/fee_bumper_missing_inputs_test.go \
+            server.go \
+            server_input_lookup_test.go
           git diff --cached --check
           git config user.name 'Valentin'
           git config user.email '6142607+vbrekher@users.noreply.github.com'

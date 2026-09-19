@@ -16,6 +16,39 @@ jobs:
       - name: Apply review fixes
         run: |
           python3 .github/tmp_review_fix_11186.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          fee = Path('sweep/fee_bumper.go')
+          text = fee.read_text()
+          replacements = {
+              '\t\t// A chain lookup can report an output as absent while its parent is\n\t\t// still unconfirmed because the backend excludes mempool outputs.\n\t\t// If the wallet knows the parent and the output index exists, keep\n':
+              '\t\t// A chain lookup can report an output as absent while its\n\t\t// parent is still unconfirmed because the backend excludes\n\t\t// mempool outputs. If the wallet knows the parent and the\n\t\t// output index exists, keep\n',
+              '\t\t// blocking lookup callback. Production wiring always provides it.\n':
+              '\t\t// blocking lookup callback. Production wiring always\n\t\t// provides it.\n',
+              '\t\t// lookup disagree. Retry instead of permanently dropping the set.\n':
+              '\t\t// lookup disagree. Retry instead of permanently dropping\n\t\t// the set.\n',
+              '\t\t// missing inputs are removed and the remaining inputs are retried.\n':
+              '\t\t// missing inputs are removed and the remaining inputs are\n\t\t// retried.\n',
+              '\t\t\t// The historical notifier can lag behind the mempool. Query\n\t\t\t// the watcher before falling back to UTXO classification so\n':
+              '\t\t\t// The historical notifier can lag behind the mempool.\n\t\t\t// Query the watcher before falling back to UTXO\n\t\t\t// classification so\n',
+              '\t\t\t\tlog.Debugf("Detected mempool spend of input=%v in tx=%v",\n\t\t\t\t\top, spendingTx.TxHash())\n':
+              '\t\t\t\tlog.Debugf(\n\t\t\t\t\t"Detected mempool spend of input=%v in tx=%v",\n\t\t\t\t\top, spendingTx.TxHash(),\n\t\t\t\t)\n',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected fee_bumper fragment: {old!r}')
+              text = text.replace(old, new, 1)
+          fee.write_text(text)
+
+          test = Path('sweep/fee_bumper_missing_inputs_test.go')
+          text = test.read_text()
+          old = '\tfor _, testCase := range tests {\n\t\ttestCase := testCase\n\t\tt.Run(testCase.name, func(t *testing.T) {\n'
+          new = '\tfor _, testCase := range tests {\n\t\tt.Run(testCase.name, func(t *testing.T) {\n'
+          if old not in text:
+              raise SystemExit('missing loop copy fragment')
+          test.write_text(text.replace(old, new, 1))
+          PY
           gofmt -w sweep/fee_bumper.go sweep/fee_bumper_missing_inputs_test.go server.go
           git diff --check
       - name: Focused missing-input regression

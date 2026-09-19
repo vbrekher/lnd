@@ -1,0 +1,45 @@
+name: Temporary review fix 11186 v2
+on: [push]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Apply review fixes
+        run: |
+          python3 .github/tmp_review_fix_11186.py
+          python3 .github/tmp_review_fix_11186_post.py
+          gofmt -w sweep/fee_bumper.go sweep/fee_bumper_missing_inputs_test.go server.go
+          git diff --check
+      - name: Focused missing-input regression
+        run: go test ./sweep -run 'TestHandleMissingInputs|TestFindMissingInputs' -count=1
+      - name: Sweep package
+        run: go test ./sweep -count=1
+      - name: Compile root package
+        run: go test . -run '^$' -count=1
+      - name: Vet changed packages
+        run: go vet ./sweep .
+      - name: Source lint
+        run: make lint-source
+      - name: Commit verified source
+        shell: bash
+        run: |
+          git rm --ignore-unmatch \
+            .github/tmp_review_fix_11186.py \
+            .github/tmp_review_fix_11186_post.py \
+            .github/workflows/tmp-review-fix-11186.yml \
+            .github/workflows/tmp-review-fix-11186-v2.yml
+          git add sweep/fee_bumper.go sweep/fee_bumper_missing_inputs_test.go server.go
+          git diff --cached --check
+          git config user.name 'Valentin'
+          git config user.email '6142607+vbrekher@users.noreply.github.com'
+          git commit -m 'sweep: harden missing-input classification'
+          git push origin HEAD:review-fix/11186-20260919

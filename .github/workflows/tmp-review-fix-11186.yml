@@ -21,9 +21,60 @@ jobs:
 
           fee = Path('sweep/fee_bumper.go')
           text = fee.read_text()
+
+          old = '''\t// MissingInputs are inputs that the blocking fallback could not locate
+\t// as current UTXOs or as outputs of wallet-known parents. Unlike
+\t// SpentInputs, the spending transaction may not be known.
+'''
+          new = '''\t// MissingInputs are inputs that the blocking fallback could not locate
+\t// as current UTXOs or as outputs of wallet-known unconfirmed parents.
+\t// Unlike SpentInputs, the spending transaction may not be known.
+'''
+          if old not in text:
+              raise SystemExit('missing MissingInputs comment')
+          text = text.replace(old, new, 1)
+
+          old = '''\t\t// A chain lookup can report an output as absent while its parent is
+\t\t// still unconfirmed because the backend excludes mempool outputs.
+\t\t// If the wallet knows the parent and the output index exists, keep
+\t\t// the input retryable instead of declaring it missing.
+\t\tif t.cfg.Wallet != nil {
+\t\t\tparent, err := t.cfg.Wallet.FetchTx(op.Hash)
+\t\t\tif err != nil {
+\t\t\t\treturn nil, err
+\t\t\t}
+\t\t\tif parent != nil && int(op.Index) < len(parent.TxOut) {
+\t\t\t\tcontinue
+\t\t\t}
+\t\t}
+'''
+          new = '''\t\t// A chain lookup can report an output as absent while its
+\t\t// parent is still unconfirmed because the backend excludes
+\t\t// mempool outputs. If the wallet knows the parent, verify that
+\t\t// it is still unconfirmed before keeping the input retryable.
+\t\tif t.cfg.Wallet != nil {
+\t\t\tparent, err := t.cfg.Wallet.FetchTx(op.Hash)
+\t\t\tif err != nil {
+\t\t\t\treturn nil, err
+\t\t\t}
+\t\t\tif parent != nil && int(op.Index) < len(parent.TxOut) {
+\t\t\t\tdetails, err := t.cfg.Wallet.GetTransactionDetails(
+\t\t\t\t\t&op.Hash,
+\t\t\t\t)
+\t\t\t\tif err != nil {
+\t\t\t\t\treturn nil, err
+\t\t\t\t}
+\t\t\t\tif details != nil && details.NumConfirmations == 0 {
+\t\t\t\t\tcontinue
+\t\t\t\t}
+\t\t\t}
+\t\t}
+'''
+          if old not in text:
+              raise SystemExit('missing wallet parent fallback')
+          text = text.replace(old, new, 1)
+
           replacements = {
-              '\t\t// A chain lookup can report an output as absent while its parent is\n\t\t// still unconfirmed because the backend excludes mempool outputs.\n\t\t// If the wallet knows the parent and the output index exists, keep\n':
-              '\t\t// A chain lookup can report an output as absent while its\n\t\t// parent is still unconfirmed because the backend excludes\n\t\t// mempool outputs. If the wallet knows the parent and the\n\t\t// output index exists, keep\n',
               '\t\t// blocking lookup callback. Production wiring always provides it.\n':
               '\t\t// blocking lookup callback. Production wiring always\n\t\t// provides it.\n',
               '\t\t// lookup disagree. Retry instead of permanently dropping the set.\n':
@@ -47,7 +98,66 @@ jobs:
           new = '\tfor _, testCase := range tests {\n\t\tt.Run(testCase.name, func(t *testing.T) {\n'
           if old not in text:
               raise SystemExit('missing loop copy fragment')
-          test.write_text(text.replace(old, new, 1))
+          text = text.replace(old, new, 1)
+
+          old = '\t"github.com/lightningnetwork/lnd/input"\n\t"github.com/lightningnetwork/lnd/lnwallet/chainfee"\n'
+          new = '\t"github.com/lightningnetwork/lnd/input"\n\t"github.com/lightningnetwork/lnd/lnwallet"\n\t"github.com/lightningnetwork/lnd/lnwallet/chainfee"\n'
+          if old not in text:
+              raise SystemExit('missing lnwallet import insertion point')
+          text = text.replace(old, new, 1)
+
+          old = '''\twallet := &MockWallet{}
+\twallet.On("FetchTx", op.Hash).Return(parent, nil).Once()
+\tdefer wallet.AssertExpectations(t)
+'''
+          new = '''\twallet := &MockWallet{}
+\twallet.On("FetchTx", op.Hash).Return(parent, nil).Once()
+\twallet.On("GetTransactionDetails", mock.Anything).Return(
+\t\t&lnwallet.TransactionDetail{NumConfirmations: 0}, nil,
+\t).Once()
+\tdefer wallet.AssertExpectations(t)
+'''
+          if old not in text:
+              raise SystemExit('missing wallet parent test mock')
+          text = text.replace(old, new, 1)
+
+          marker = '''// TestHandleMissingInputsMempoolSpend verifies that a spender already visible
+'''
+          confirmed_test = r'''// TestFindMissingInputsConfirmedWalletParent verifies that a wallet-known
+// parent is not enough to keep an actually spent confirmed output retryable.
+func TestFindMissingInputsConfirmedWalletParent(t *testing.T) {
+\tt.Parallel()
+
+\tinp := createTestInput(10_000, input.WitnessKeyHash)
+\top := inp.OutPoint()
+\tparent := wire.NewMsgTx(2)
+\tparent.AddTxOut(&wire.TxOut{Value: 10_000})
+
+\twallet := &MockWallet{}
+\twallet.On("FetchTx", op.Hash).Return(parent, nil).Once()
+\twallet.On("GetTransactionDetails", mock.Anything).Return(
+\t\t&lnwallet.TransactionDetail{NumConfirmations: 1}, nil,
+\t).Once()
+\tdefer wallet.AssertExpectations(t)
+
+\tpublisher := NewTxPublisher(TxPublisherConfig{
+\t\tWallet: wallet,
+\t\tIsInputUnspent: func(input.Input) (bool, error) {
+\t\t\treturn false, nil
+\t\t},
+\t})
+
+\tmissing, err := publisher.findMissingInputs([]input.Input{&inp})
+
+\trequire.NoError(t, err)
+\trequire.Contains(t, missing, op)
+}
+
+'''.replace('\\t', '\t')
+          if marker not in text:
+              raise SystemExit('missing confirmed parent insertion point')
+          text = text.replace(marker, confirmed_test + marker, 1)
+          test.write_text(text)
           PY
           gofmt -w sweep/fee_bumper.go sweep/fee_bumper_missing_inputs_test.go server.go
           git diff --check
